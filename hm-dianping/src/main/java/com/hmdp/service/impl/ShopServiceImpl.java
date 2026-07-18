@@ -12,6 +12,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.CACHE_NULL_TTL;
+import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 
 /**
  * <p>
@@ -29,7 +33,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Override
     public Result queryById(Long id) {
-        String key = "cache:shop:" + id;
+        String key = CACHE_SHOP_KEY + id;
 
         // 1. 从redis查询商铺缓存
         String shopJson = stringRedisTemplate.opsForValue().get(key);
@@ -37,7 +41,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 2. 判断是否存在
         if (StrUtil.isNotBlank(shopJson)) {
             // 3. 存在，直接返回
-            Shop shop = JSONUtil.toBean(shopJson, Shop.class);
+            Shop shop = JSONUtil.toBean(shopJson, Shop.class);  //- toBean() 只是把 JSON 数据转换成"数据文件"（JavaBean），和 Spring 容器无关
             return Result.ok(shop);
         }
 
@@ -50,9 +54,23 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         // 6. 存在，写入redis
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop));
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop),CACHE_NULL_TTL, TimeUnit.MINUTES);
 
         // 7. 返回
         return Result.ok(shop);
+    }
+
+    @Override
+    public Result update(Shop shop) {
+        Long id = shop.getId();
+        if (id == null) {
+            return Result.fail("店铺id为空");
+        }
+
+        //更新数据库
+        updateById(shop);
+        //删除缓存
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+        return null;
     }
 }
