@@ -10,12 +10,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.CACHE_NULL_TTL;
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
@@ -31,6 +31,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    //获取锁及释放锁
+    private boolean trylock(String key){
+        Boolean lock = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(lock);
+    }
+
+    private boolean unlock(String key){
+        Boolean lock = stringRedisTemplate.delete(key);
+        return lock;
+    }
+
     @Override
     public Result queryById(Long id) {
         String key = CACHE_SHOP_KEY + id;
@@ -45,22 +56,28 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return Result.ok(shop);
         }
 
+        if("".equals(shopJson)){
+            return Result.fail("店铺不存在！");
+        }
+
         // 4. 不存在，根据id查询数据库
         Shop shop = getById(id);
 
         // 5. 不存在，返回错误
         if (shop == null) {
+            stringRedisTemplate.opsForValue().set(key, "",CACHE_NULL_TTL, TimeUnit.MINUTES);
             return Result.fail("店铺不存在！");
         }
 
         // 6. 存在，写入redis
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop),CACHE_NULL_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop),CACHE_SHOP_TTL, TimeUnit.MINUTES);
 
         // 7. 返回
         return Result.ok(shop);
     }
 
     @Override
+    @Transactional
     public Result update(Shop shop) {
         Long id = shop.getId();
         if (id == null) {
