@@ -219,14 +219,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return shop;
     }*/
 
-    /*public void saveShopToRedis(Long id,Long expireSeconds){
+    public void saveShopToRedis(Long id,Long expireSeconds){
         Shop shop = getById(id);
         RedisData redisData = new RedisData();
         redisData.setData(shop);
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(expireSeconds));
 
         stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(redisData));
-    }*/
+    }
 
     @Override
     @Transactional
