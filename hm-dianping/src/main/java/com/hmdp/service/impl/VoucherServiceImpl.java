@@ -36,10 +36,11 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     }
 
     @Override
-    @Transactional
+    @Transactional      //Spring 事务注解
     public void addSeckillVoucher(Voucher voucher) {
         // 保存优惠券
         save(voucher);
+          //MyBatis-Plus 默认规则：**实体类名首字母小写，驼峰转下划线 = 表名**   类名 `Voucher` → 默认表名：**voucher**
         // 保存秒杀信息
         SeckillVoucher seckillVoucher = new SeckillVoucher();
         seckillVoucher.setVoucherId(voucher.getId());
@@ -47,5 +48,22 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
+        //interface IService<T> 中 定义default boolean save(T entity)
+        //此类 extends ServiceImpl<VoucherMapper, Voucher>,
+        //而ServiceImpl<M extends BaseMapper<T>, T> implements IService<T>
+        //所以 this.save 只能传 Voucher 而不能传 SeckillVoucher
     }
+
+    /*
+    1. 传入 `Voucher` 对象（包含基础优惠券信息、库存、开始 / 结束时间）
+    2. **save(voucher)**：先向 `voucher` 表插入普通优惠券记录
+
+    > ⚠️ 关键点：MyBatis-Plus 主键自增策略生效后，`voucher.getId()` 才会被回填主键！
+    >  在 `save()` **执行之前**，`voucher.getId()` 是 `null`
+    >  执行 `save(voucher)` 往数据库插入数据之后，**数据库自动生成主键 ID，MyBatis-Plus 会把这个 ID 重新塞回你传入的 voucher 对象中**；
+
+    3. 构建 `SeckillVoucher` 对象，关联优惠券 ID、库存、秒杀起止时间
+    4. `seckillVoucherService.save()`：向 `seckill_voucher` 插入秒杀专属信息
+    */
+
 }

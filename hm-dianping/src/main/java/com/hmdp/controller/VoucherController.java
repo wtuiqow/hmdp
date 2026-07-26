@@ -39,8 +39,9 @@ public class VoucherController {
      * @param voucher 优惠券信息，包含秒杀信息
      * @return 优惠券id
      */
-    @PostMapping("seckill")
-    public Result addSeckillVoucher(@RequestBody Voucher voucher) {
+    @PostMapping("seckill")     //@PostMapping("seckill") .POST 请求接口,地址拼接/seckill
+    // 完整地址 http://ip:端口/voucher/seckill    (类注解@RequestMapping("/voucher"))     （springboot server:port: 8081
+    public Result addSeckillVoucher(@RequestBody Voucher voucher) {     //@RequestBody,读取前端【请求体 JSON】，自动转换成 Java 对象 Voucher
         voucherService.addSeckillVoucher(voucher);
         return Result.ok(voucher.getId());
     }
