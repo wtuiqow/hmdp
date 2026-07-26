@@ -52,7 +52,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         //5，扣减库存
         boolean success = seckillVoucherService.update()
-                .setSql("stock= stock -1").eq("voucher_id", voucherId)
+                .setSql("stock= stock -1").eq("voucher_id", voucherId).gt("stock",0)
                 .update();
         if(!success){
             return Result.fail("卖完了");
@@ -63,7 +63,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
         // 6.2.用户id
-        Long userId = UserHolder.getUser().getId();     //`UserHolder` 是一个**基于 ThreadLocal 封装的工具类**，用来在同一**一次请求链路**里，随时随地获取当前登录用户信息
+        Long userId = UserHolder.getUser().getId();
+          //`UserHolder` 是一个**基于 ThreadLocal 封装的工具类**，用来在同一**一次请求链路**里，随时随地获取当前登录用户信息
         voucherOrder.setUserId(userId);
         // 6.3.代金券id
         voucherOrder.setVoucherId(voucherId);
