@@ -9,6 +9,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
 
     @Override
-    @Transactional      //事务
     public Result seckillVoucher(Long voucherId) {
         // 1.查询优惠券
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
@@ -50,21 +50,46 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if(voucher.getStock() < 1){
             return Result.fail("卖完了");
         }
+
+        Long userId = UserHolder.getUser().getId();
+        synchronized (userId.toString().intern()) {
+            //toString()每次返回一个值相等的新对象，需要intern()规范字符串返回（如果池中存在匹配 equals() 的对象，返回它
+            //锁加在这里会在事务提交完(数据库更改完毕)才释放，加在事务内部可能导致事务未提交，而其他线程已经获取到锁了
+            IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+            //不能（this.）createVoucherOrder(voucherId)，Spring事务生效需要对类进行动态代理，拿代理对象进行事务处理
+        }
+    }
+
+    @Transactional      //事务  扣减库存 和 创建订单，必须同时成功、同时失败
+    public Result createVoucherOrder(Long voucherId) {
+        //get userid
+        Long userId = UserHolder.getUser().getId();
+        //userorder
+        int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        //if userorder exists ?
+        //yes fail
+        if (count > 0) {
+            return Result.fail("只能购买一张");
+        }
+        //no continue
+
         //5，扣减库存
         boolean success = seckillVoucherService.update()
-                .setSql("stock= stock -1").eq("voucher_id", voucherId).gt("stock",0)
+                .setSql("stock= stock -1").eq("voucher_id", voucherId).gt("stock", 0)
                 .update();
-        if(!success){
+        if (!success) {
             return Result.fail("卖完了");
         }
+
         //6.创建订单
         VoucherOrder voucherOrder = new VoucherOrder();
         // 6.1.订单id
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
-        // 6.2.用户id
+        /*// 6.2.用户id
         Long userId = UserHolder.getUser().getId();
-          //`UserHolder` 是一个**基于 ThreadLocal 封装的工具类**，用来在同一**一次请求链路**里，随时随地获取当前登录用户信息
+          //`UserHolder` 是一个**基于 ThreadLocal 封装的工具类**，用来在同一**一次请求链路**里，随时随地获取当前登录用户信息*/
         voucherOrder.setUserId(userId);
         // 6.3.代金券id
         voucherOrder.setVoucherId(voucherId);
@@ -72,5 +97,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         save(voucherOrder);
 
         return Result.ok(orderId);
+
     }
 }
