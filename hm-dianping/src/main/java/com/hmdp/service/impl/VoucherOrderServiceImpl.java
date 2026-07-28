@@ -7,15 +7,19 @@ import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.ILock;
+import com.hmdp.utils.Lock;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -33,6 +37,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Autowired
     private RedisIdWorker redisIdWorker;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -52,13 +58,27 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
 
         Long userId = UserHolder.getUser().getId();
-        synchronized (userId.toString().intern()) {
+
+        /*synchronized (userId.toString().intern()) {
             //toString()每次返回一个值相等的新对象，需要intern()规范字符串返回（如果池中存在匹配 equals() 的对象，返回它
             //锁加在这里会在事务提交完(数据库更改完毕)才释放，加在事务内部可能导致事务未提交，而其他线程已经获取到锁了
             IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
             //不能（this.）createVoucherOrder(voucherId)，Spring事务生效需要对类进行动态代理，拿代理对象进行事务处理
+        }*/
+
+        Lock lock = new Lock("order:"+userId,stringRedisTemplate);
+        if(!lock.tryLock(100)){
+            return Result.fail("一人一单");
         }
+        try {
+            IVoucherOrderService proxy = (IVoucherOrderService)AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        }finally{
+            //出现异常时释放锁
+            lock.unLock();
+        }
+
     }
 
     @Transactional      //事务  扣减库存 和 创建订单，必须同时成功、同时失败
@@ -99,4 +119,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         return Result.ok(orderId);
 
     }
+
+
+
+
 }
