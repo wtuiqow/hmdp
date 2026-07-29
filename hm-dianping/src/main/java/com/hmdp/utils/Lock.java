@@ -20,7 +20,8 @@ public class Lock implements ILock{
     public boolean tryLock(long timeoutSec) {
 
         long threadId = Thread.currentThread().getId();
-        Boolean lock = stringRedisTemplate.opsForValue().setIfAbsent(KEY_PREFIX + name, threadId + "", timeoutSec, TimeUnit.SECONDS);
+        Boolean lock = stringRedisTemplate.opsForValue().setIfAbsent(
+                KEY_PREFIX + name, threadId + "", timeoutSec, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(lock);
     }
 

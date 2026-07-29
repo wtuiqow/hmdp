@@ -11,6 +11,8 @@ import com.hmdp.utils.ILock;
 import com.hmdp.utils.Lock;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -34,6 +36,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Resource
     private ISeckillVoucherService seckillVoucherService;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     @Autowired
     private RedisIdWorker redisIdWorker;
@@ -67,8 +72,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             //不能（this.）createVoucherOrder(voucherId)，Spring事务生效需要对类进行动态代理，拿代理对象进行事务处理
         }*/
 
-        Lock lock = new Lock("order:"+userId,stringRedisTemplate);
-        if(!lock.tryLock(100)){
+        //Lock lock = new Lock("order:"+userId,stringRedisTemplate);
+
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+
+        if(!lock.tryLock()){
             return Result.fail("一人一单");
         }
         try {
@@ -76,7 +84,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return proxy.createVoucherOrder(voucherId);
         }finally{
             //出现异常时释放锁
-            lock.unLock();
+            lock.unlock();
         }
 
     }
