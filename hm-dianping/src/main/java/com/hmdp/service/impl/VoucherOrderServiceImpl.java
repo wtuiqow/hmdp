@@ -10,6 +10,7 @@ import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -46,6 +47,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
     IVoucherOrderService proxy;
 
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
@@ -74,7 +78,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail(r == 2 ? "一人一单" : "库存不足（或库存key不存在）");
         }
 
-        //有购买资格,存入阻塞队列，让其他服务完成对mysql的订单写入
+        //有购买资格,存入队列，让其他服务完成对mysql的订单写入
         VoucherOrder voucherOrder = new VoucherOrder();
         // 2.3.订单id（新创建的
         voucherOrder.setId(orderId);
@@ -86,8 +90,15 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         //获取代理对象
         proxy = (IVoucherOrderService)AopContext.currentProxy();
 
-        // 2.6.放入阻塞队列
-        orderTasks.add(voucherOrder);
+        /*// 2.6.放入阻塞队列
+        orderTasks.add(voucherOrder);*/
+
+        //rabbitmq
+
+        //交换机名
+        String exchangeName = "hmdp.mq";
+        //发送
+        rabbitTemplate.convertAndSend(exchangeName, "", voucherOrder);
 
         return Result.ok(orderId);
     }

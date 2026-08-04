@@ -21,6 +21,16 @@ spring:
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
 
+  rabbitmq:
+    host: 192.168.88.128
+    port: 5672
+    username: itcast
+    password: 123321
+    virtual-host: /
+    listener:
+      simple:
+        prefetch: 1
+
 
 
 mybatis-plus:
