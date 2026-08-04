@@ -70,7 +70,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         );
 
         if(r != 0){
-            return Result.fail(r == 2 ? "一人一单" : "卖完了");
+            if(r == 3)return Result.fail("redis中无缓存");
+            return Result.fail(r == 2 ? "一人一单" : "库存不足（或库存key不存在）");
         }
 
         //有购买资格,存入阻塞队列，让其他服务完成对mysql的订单写入
