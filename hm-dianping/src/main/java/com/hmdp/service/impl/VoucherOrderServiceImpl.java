@@ -10,6 +10,7 @@ import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.concurrent.*;
 
@@ -50,7 +52,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    IVoucherOrderService proxy;
+    /*IVoucherOrderService proxy;*/
 
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
     static{
@@ -87,8 +89,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 2.5.代金券id（原本有的,指哪种优惠券
         voucherOrder.setVoucherId(voucherId);
 
-        //获取代理对象
-        proxy = (IVoucherOrderService)AopContext.currentProxy();
+        /*//获取代理对象
+        proxy = (IVoucherOrderService)AopContext.currentProxy();*/
 
         /*// 2.6.放入阻塞队列
         orderTasks.add(voucherOrder);*/
@@ -103,7 +105,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         return Result.ok(orderId);
     }
 
-    //异步处理线程池
+
+
+    /*//异步处理线程池
     private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
 
     //阻塞队列
@@ -114,6 +118,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private void init(){
         SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
     }
+
 
     private class VoucherOrderHandler implements Runnable{
         @Override
@@ -138,7 +143,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
               //需要提前获取，放到父类中
 
         }
-    }
+    }*/
 
 
 
@@ -187,6 +192,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }*/
 
     @Transactional      //事务  扣减库存 和 创建订单，必须同时成功、同时失败
+    //事务注解是需要 AOP 增强的注解，这类注解都会让 Spring 为这个 Bean 创建代理
     public Result createVoucherOrder(VoucherOrder voucherOrder) {
         //get userid
 //        Long userId = UserHolder.getUser().getId();
