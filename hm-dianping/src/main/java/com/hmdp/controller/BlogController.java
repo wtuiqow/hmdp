@@ -32,6 +32,12 @@ public class BlogController {
     @Resource
     private IUserService userService;
 
+    //查看Blog
+    @GetMapping("/{id}")
+    public Result getBlogById(@PathVariable("id") Long id) {
+        return blogService.queryBlogById(id);
+    }
+
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         // 获取登录用户
@@ -65,6 +71,10 @@ public class BlogController {
 
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+
+        return blogService.queryHotBlog(current);
+
+        /*封装
         // 根据用户查询
         Page<Blog> page = blogService.query()
                 .orderByDesc("liked")
@@ -79,5 +89,6 @@ public class BlogController {
             blog.setIcon(user.getIcon());
         });
         return Result.ok(records);
+        */
     }
 }
