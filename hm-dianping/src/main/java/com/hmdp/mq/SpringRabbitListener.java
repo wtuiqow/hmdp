@@ -27,6 +27,7 @@ public class SpringRabbitListener {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+    //点赞
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = "direct.likeBlog.queue1"),
             exchange = @Exchange(name = "hmdp.direct",type = "direct"),

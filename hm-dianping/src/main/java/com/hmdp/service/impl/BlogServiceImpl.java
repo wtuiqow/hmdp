@@ -110,6 +110,15 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
 
+        // Redis 缓存丢了，先用 MySQL 的 liked 初始化，再执行 Lua
+        String countKey = "blog:liked:count:" + id;
+        if (stringRedisTemplate.opsForValue().get(countKey) == null) {
+            Blog blog = getById(id);
+            if (blog != null) {
+                stringRedisTemplate.opsForValue().set(countKey, String.valueOf(blog.getLiked()));
+            }
+        }
+
         //执行lua，判断是否点赞，并在redis数据库执行对应操作（点赞或取消点赞并更新点赞状态
         Long r = stringRedisTemplate.execute(
                 LIKED_SCRIPT,
