@@ -67,7 +67,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         Long userId = UserHolder.getUser().getId();
         long orderId = redisIdWorker.nextId("order");
 
-        //执行lua，判断购买资格
+        //执行lua，判断购买资格，如果有，在redis数据库执行对应操作，没有他可能把库存扣到-1
+        //① 判断库存：get seckill:stock:11
+        //② 判断一人一单：sismember seckill:order
+        //③ 扣库存：incrby seckill:stock:11 -1
+        //④ 记录用户：sadd seckill:order:11 userId
         Long r = stringRedisTemplate.execute(
                 SECKILL_SCRIPT,
                 Collections.emptyList(),
@@ -76,7 +80,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         );
 
         if(r != 0){
-            if(r == 3)return Result.fail("redis中无缓存");
             return Result.fail(r == 2 ? "一人一单" : "库存不足（或库存key不存在）");
         }
 
