@@ -1,5 +1,8 @@
 package com.hmdp.service.impl;
 
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -14,15 +17,16 @@ import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
 
@@ -42,6 +46,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Resource
     private IUserService userService;
+    @Qualifier("redisTemplate")
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @Override
     public Result queryBlogById(Long id) {
@@ -74,6 +81,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private void isBlogLiked(Blog blog) {
         //获取当前用户
         UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            return;  //未登陆，无需查询是否点赞
+        }
         Long userId = user.getId();
         String key = BLOG_LIKED_KEY + blog.getId();
         Boolean isLiked = stringRedisTemplate.opsForZSet().score(key, userId.toString()) != null;
@@ -129,6 +139,43 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         sendDirectExchange(id);
 
         return Result.ok();
+    }
+
+    @Override
+    public Result getLikesById(Long blogid) {
+        String key = BLOG_LIKED_KEY + blogid;
+        //获取点赞前五人id
+        Set<String> top5 = stringRedisTemplate.opsForZSet().range(key,0,4);
+        if(top5 == null||top5.isEmpty()){
+            return Result.ok(Collections.emptyList());
+        }
+
+        //获取用户
+        List<Long> userIds = top5.stream()
+                // 中间操作map：元素类型转换 String→Long
+                .map(Long::valueOf)
+                // 终端操作collect：把流转成List集合
+                .collect(Collectors.toList());
+
+        List<User> userList = userService.listByIds(userIds);
+
+        /*List<UserDTO> dtoList = new ArrayList<>();
+        userList.forEach(user -> {
+            // 先创建DTO实例，再拷贝属性
+            UserDTO dto = new UserDTO();
+            BeanUtil.copyProperties(user, dto);
+            dtoList.add(dto);
+        });*/
+
+        String idStr = StrUtil.join(",", userIds);
+        // 3.根据用户id查询用户 WHERE id IN ( 5 , 1 ) ORDER BY FIELD(id, 5, 1)
+        List<UserDTO> userDTOS = userService.query()
+                .in("id", userIds).last("ORDER BY FIELD(id," + idStr + ")").list()
+                .stream()
+                .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
+                .collect(Collectors.toList());
+
+        return Result.ok(userDTOS);
     }
 
     private void queryBlogUser(Blog blog) {
