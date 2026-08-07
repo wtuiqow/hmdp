@@ -62,7 +62,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     @Override
-    public Result seckillVoucher(Long voucherId){
+    public Result seckillVoucher(Long voucherId) throws InterruptedException {
         //获取lua脚本需要的参数
         Long userId = UserHolder.getUser().getId();
         long orderId = redisIdWorker.nextId("order");
@@ -99,13 +99,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         orderTasks.add(voucherOrder);*/
 
         //rabbitmq
-
-        //交换机名
-        String exchangeName = "hmdp.mq";
-        //发送
-        rabbitTemplate.convertAndSend(exchangeName, "", voucherOrder);
+        sendDirectExchange(voucherOrder);
 
         return Result.ok(orderId);
+    }
+
+    public void sendDirectExchange(VoucherOrder voucherOrder) throws InterruptedException {
+        //交换机名
+        String exchangeName = "hmdp.direct";
+        //发送
+        rabbitTemplate.convertAndSend(exchangeName, "secKill", voucherOrder);
     }
 
 
