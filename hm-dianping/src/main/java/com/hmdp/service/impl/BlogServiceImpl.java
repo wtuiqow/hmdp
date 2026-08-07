@@ -1,6 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.util.BooleanUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -77,8 +76,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         UserDTO user = UserHolder.getUser();
         Long userId = user.getId();
         String key = BLOG_LIKED_KEY + blog.getId();
-        Boolean isMember = stringRedisTemplate.opsForSet().isMember(key, userId.toString());
-        blog.setIsLike(BooleanUtil.isTrue(isMember));
+        Boolean isLiked = stringRedisTemplate.opsForZSet().score(key, userId.toString()) != null;
+        blog.setIsLike(isLiked);
     }
 
     @Autowired
@@ -123,7 +122,8 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         Long r = stringRedisTemplate.execute(
                 LIKED_SCRIPT,
                 Arrays.asList(BLOG_LIKED_KEY + id, "blog:liked:count:" + id),
-                String.valueOf(userId)
+                String.valueOf(userId),
+                String.valueOf(System.currentTimeMillis())  //从 1970-01-01 00:00:00 UTC（Unix 纪元）到当前时刻经过的毫秒数。
         );
 
         sendDirectExchange(id);
